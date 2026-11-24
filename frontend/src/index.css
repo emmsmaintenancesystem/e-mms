@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: #090A10;
+    color: #F3F5FA;
+    font-family: 'Sarabun', 'IBM Plex Sans Thai', 'Noto Sans Thai', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Custom dark scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #090A10;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1E2235;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2F6BFF;
+  }
+}
+
+@layer components {
+  .emms-card {
+    @apply bg-[#121420] border border-[#1E2235] rounded-2xl shadow-lg;
+  }
+
+  .emms-input {
+    @apply w-full bg-[#090A10] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-[#F3F5FA] placeholder-[#9BA3B8]/60
+           focus:outline-none focus:border-[#2F6BFF] focus:ring-2 focus:ring-[#2F6BFF]/30 transition-colors;
+  }
+
+  .emms-select {
+    @apply w-full bg-[#090A10] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-[#F3F5FA]
+           focus:outline-none focus:border-[#2F6BFF] focus:ring-2 focus:ring-[#2F6BFF]/30 transition-colors;
+  }
+
+  .emms-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-[#2F6BFF] hover:bg-[#2457DB] text-white font-semibold
+           px-4 py-2.5 rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/50
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .emms-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-[#171A29] hover:bg-[#1E2235] text-[#F3F5FA]
+           border border-[#1E2235] font-medium px-4 py-2.5 rounded-xl transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-[#2F6BFF]/30 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .emms-btn-accent {
+    @apply inline-flex items-center justify-center gap-2 bg-[#FF7A1A] hover:bg-[#E6680C] text-[#090A10] font-bold
+           px-4 py-2.5 rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#FF7A1A]/50
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+}
+
+/* =============================================================================
+   Print / Save PDF Stylesheet (@media print) — ADR-001, ADR-008, Golden Rule 4.2
+   Automatically switches from 60-30-10 Midnight Black to crisp White Paper & Black Text
+   ============================================================================= */
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm 12mm;
+  }
+
+  :root {
+    color-scheme: light !important;
+  }
+
+  html,
+  body,
+  #root {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    line-height: 1.35 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .emms-card,
+  .print-surface {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    border: 1px solid #333333 !important;
+    box-shadow: none !important;
+    border-radius: 6px !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Ensure all text inside report cards and tables prints crisp black/dark gray */
+  .print-container,
+  .print-container * {
+    color: #000000 !important;
+    border-color: #999999 !important;
+  }
+
+  .print-container table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    background: #FFFFFF !important;
+  }
+
+  .print-container th,
+  .print-container td {
+    border: 1px solid #444444 !important;
+    padding: 5px 7px !important;
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+
+  .print-container thead th {
+    background-color: #F0F2F5 !important;
+    font-weight: 700 !important;
+  }
+
+  .print-container tfoot td,
+  .print-container tfoot th {
+    background-color: #F7F8FA !important;
+    font-weight: 700 !important;
+  }
+}

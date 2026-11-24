@@ -1,0 +1,42 @@
+# --- Secrets & Environment Variables ---
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.crt
+*.p12
+*.secret
+service-account*.json
+
+# --- Local Governance, Prompts & Agent Workspace (Never Push to GitHub) ---
+Master_Prompt.md
+AGENTS.md
+GEMINI.md
+.agents/
+.agent/
+_agents/
+_agent/
+
+# --- Frontend (Node / Vite) ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# --- Backend (Go) ---
+backend/bin/
+backend/tmp/
+*.exe
+*.out
+*.test
+coverage.out
+
+# --- OS & IDE ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.log

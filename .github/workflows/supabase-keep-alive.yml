@@ -1,0 +1,40 @@
+# =============================================================================
+# e-MaintenanceManagementSystem (e-MMS)
+# GitHub Actions Workflow: Supabase Free-Tier Keep-Alive Cron (Every 5 Days)
+# Pings GET /api/health on Cloud Run -> executes SELECT 1 on Supabase PostgreSQL
+# =============================================================================
+name: Supabase Free-Tier Keep-Alive
+
+on:
+  schedule:
+    # รันอัตโนมัติทุกๆ 5 วัน เวลา 03:00 UTC (10:00 น. เวลาประเทศไทย)
+    - cron: '0 3 */5 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping-health:
+    name: Ping Backend & Database Health Endpoint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call GET /api/health
+        env:
+          API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "::error::ไม่พบค่า Repository Variable ชื่อ VITE_API_BASE_URL กรุณาตั้งค่าใน GitHub Settings -> Secrets and variables -> Actions -> Variables"
+            exit 1
+          fi
+
+          CLEAN_BASE_URL="${API_BASE_URL%/}"
+          TARGET_URL="${CLEAN_BASE_URL}/api/health"
+          echo "Pinging health endpoint: ${TARGET_URL}"
+
+          RESPONSE=$(curl -fsS --retry 3 --retry-delay 10 --retry-connrefused --max-time 90 "${TARGET_URL}")
+          echo "Health check response: ${RESPONSE}"
+
+          echo "${RESPONSE}" | grep -q '"status":"ok"'
+          echo "Supabase PostgreSQL & Backend Keep-Alive succeeded."
