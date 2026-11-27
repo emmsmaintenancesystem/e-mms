@@ -144,6 +144,19 @@ type Category struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type Subcategory struct {
+	ID           int       `json:"id"`
+	CategoryID   int       `json:"category_id"`
+	CategoryName string    `json:"category_name,omitempty"`
+	Code         *string   `json:"code"`
+	Name         string    `json:"name"`
+	Description  *string   `json:"description"`
+	SortOrder    int       `json:"sort_order"`
+	IsActive     bool      `json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type ReporterType struct {
 	ID        int       `json:"id"`
 	Code      *string   `json:"code"`
@@ -184,6 +197,7 @@ type PublicMasterDataResponse struct {
 	Floors        []Floor        `json:"floors"`
 	Rooms         []Room         `json:"rooms"`
 	Categories    []Category     `json:"categories"`
+	Subcategories []Subcategory  `json:"subcategories"`
 	ReporterTypes []ReporterType `json:"reporter_types"`
 }
 
@@ -237,6 +251,8 @@ type Ticket struct {
 	LocationDetail       *string            `json:"location_detail"`
 	CategoryID           int                `json:"category_id"`
 	CategoryName         string             `json:"category_name"`
+	SubcategoryID        *int               `json:"subcategory_id"`
+	SubcategoryName      *string            `json:"subcategory_name,omitempty"`
 	ReporterTypeID       int                `json:"reporter_type_id"`
 	ReporterTypeName     string             `json:"reporter_type_name"`
 	Description          string             `json:"description"`
@@ -257,16 +273,18 @@ type Ticket struct {
 	StatusLogs           []TicketStatusLog  `json:"status_logs,omitempty"`
 }
 
-// DuplicateTicketSummary represents an existing open ticket in the same room + category.
+// DuplicateTicketSummary represents an existing open ticket in the same room + category/subcategory.
 type DuplicateTicketSummary struct {
-	TicketCode     string    `json:"ticket_code"`
-	Status         string    `json:"status"`
-	StatusLabel    string    `json:"status_label"`
-	RoomName       string    `json:"room_name"`
-	CategoryName   string    `json:"category_name"`
-	LocationDetail *string   `json:"location_detail"`
-	Description    string    `json:"description"`
-	CreatedAt      time.Time `json:"created_at"`
+	TicketCode      string    `json:"ticket_code"`
+	Status          string    `json:"status"`
+	StatusLabel     string    `json:"status_label"`
+	RoomName        string    `json:"room_name"`
+	CategoryName    string    `json:"category_name"`
+	SubcategoryID   *int      `json:"subcategory_id,omitempty"`
+	SubcategoryName *string   `json:"subcategory_name,omitempty"`
+	LocationDetail  *string   `json:"location_detail"`
+	Description     string    `json:"description"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type DuplicateCheckResponse struct {
@@ -277,18 +295,20 @@ type DuplicateCheckResponse struct {
 
 // PublicBoardItem strictly excludes photo URLs and internal admin notes (ADR-005 & Golden Rule 4.3).
 type PublicBoardItem struct {
-	TicketCode     string    `json:"ticket_code"`
-	BuildingID     int       `json:"building_id"`
-	BuildingName   string    `json:"building_name"`
-	FloorName      string    `json:"floor_name"`
-	RoomName       string    `json:"room_name"`
-	LocationDetail *string   `json:"location_detail,omitempty"`
-	CategoryID     int       `json:"category_id"`
-	CategoryName   string    `json:"category_name"`
-	Status         string    `json:"status"`
-	StatusLabel    string    `json:"status_label"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	TicketCode      string    `json:"ticket_code"`
+	BuildingID      int       `json:"building_id"`
+	BuildingName    string    `json:"building_name"`
+	FloorName       string    `json:"floor_name"`
+	RoomName        string    `json:"room_name"`
+	LocationDetail  *string   `json:"location_detail,omitempty"`
+	CategoryID      int       `json:"category_id"`
+	CategoryName    string    `json:"category_name"`
+	SubcategoryID   *int      `json:"subcategory_id,omitempty"`
+	SubcategoryName *string   `json:"subcategory_name,omitempty"`
+	Status          string    `json:"status"`
+	StatusLabel     string    `json:"status_label"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type PublicBoardResponse struct {
@@ -313,6 +333,7 @@ type CreateTicketInput struct {
 	RoomID         int
 	LocationDetail *string
 	CategoryID     int
+	SubcategoryID  *int
 	ReporterTypeID int
 	Description    string
 	Photos         []CreateTicketPhotoRecord
@@ -330,16 +351,17 @@ type UpdateStatusInput struct {
 
 // TicketFilter specifies query criteria for staff ticket listings.
 type TicketFilter struct {
-	Status     string
-	BuildingID int
-	FloorID    int
-	RoomID     int
-	CategoryID int
-	Search     string
-	Year       int
-	Month      int
-	Limit      int
-	Offset     int
+	Status        string
+	BuildingID    int
+	FloorID       int
+	RoomID        int
+	CategoryID    int
+	SubcategoryID int
+	Search        string
+	Year          int
+	Month         int
+	Limit         int
+	Offset        int
 }
 
 type PaginatedTicketsResponse struct {
@@ -404,6 +426,20 @@ type CategoryStatItem struct {
 	Percentage   float64 `json:"percentage"`
 }
 
+type SubcategoryStatItem struct {
+	SubcategoryID   int     `json:"subcategory_id"`
+	CategoryID      int     `json:"category_id"`
+	CategoryName    string  `json:"category_name"`
+	SubcategoryCode string  `json:"subcategory_code"`
+	SubcategoryName string  `json:"subcategory_name"`
+	Total           int     `json:"total"`
+	OpenBacklog     int     `json:"open_backlog"`
+	Completed       int     `json:"completed"`
+	Unrepairable    int     `json:"unrepairable"`
+	Cancelled       int     `json:"cancelled"`
+	Percentage      float64 `json:"percentage"`
+}
+
 type BuildingStatItem struct {
 	BuildingID   int     `json:"building_id"`
 	BuildingCode string  `json:"building_code"`
@@ -452,16 +488,17 @@ type TechnicianStatItem struct {
 }
 
 type ReportSummaryResponse struct {
-	Filter              ReportFilter         `json:"filter"`
-	Overview            ReportOverview       `json:"overview"`
-	StatusBreakdown     []StatusStatItem     `json:"status_breakdown"`
-	MonthlyTrend        []MonthlyTrendItem   `json:"monthly_trend"`
-	ByCategory          []CategoryStatItem   `json:"by_category"`
-	ByBuilding          []BuildingStatItem   `json:"by_building"`
-	TopRooms            []RoomHotspotItem    `json:"top_rooms"`
-	ExecutiveMatrix     []ExecutiveMatrixRow `json:"executive_matrix"`
-	BuildingMonthMatrix []ExecutiveMatrixRow `json:"building_month_matrix"`
-	ByTechnician        []TechnicianStatItem `json:"by_technician"`
+	Filter              ReportFilter          `json:"filter"`
+	Overview            ReportOverview        `json:"overview"`
+	StatusBreakdown     []StatusStatItem      `json:"status_breakdown"`
+	MonthlyTrend        []MonthlyTrendItem    `json:"monthly_trend"`
+	ByCategory          []CategoryStatItem    `json:"by_category"`
+	BySubcategory       []SubcategoryStatItem `json:"by_subcategory"`
+	ByBuilding          []BuildingStatItem    `json:"by_building"`
+	TopRooms            []RoomHotspotItem     `json:"top_rooms"`
+	ExecutiveMatrix     []ExecutiveMatrixRow  `json:"executive_matrix"`
+	BuildingMonthMatrix []ExecutiveMatrixRow  `json:"building_month_matrix"`
+	ByTechnician        []TechnicianStatItem  `json:"by_technician"`
 }
 
 // ExportTicketRow holds flattened fields for CSV and Excel (.xlsx) export.
@@ -473,6 +510,7 @@ type ExportTicketRow struct {
 	RoomName         string
 	LocationDetail   string
 	CategoryName     string
+	SubcategoryName  string
 	ReporterTypeName string
 	Description      string
 	Status           string

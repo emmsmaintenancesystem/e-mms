@@ -48,16 +48,17 @@ func (h *TicketHandler) ListTickets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filter := model.TicketFilter{
-		Status:     status,
-		BuildingID: parseIntQuery(r, "building_id", 0),
-		FloorID:    parseIntQuery(r, "floor_id", 0),
-		RoomID:     parseIntQuery(r, "room_id", 0),
-		CategoryID: parseIntQuery(r, "category_id", 0),
-		Search:     strings.TrimSpace(r.URL.Query().Get("search")),
-		Year:       parseIntQuery(r, "year", 0),
-		Month:      parseIntQuery(r, "month", 0),
-		Limit:      parseIntQuery(r, "limit", 50),
-		Offset:     parseIntQuery(r, "offset", 0),
+		Status:        status,
+		BuildingID:    parseIntQuery(r, "building_id", 0),
+		FloorID:       parseIntQuery(r, "floor_id", 0),
+		RoomID:        parseIntQuery(r, "room_id", 0),
+		CategoryID:    parseIntQuery(r, "category_id", 0),
+		SubcategoryID: parseIntQuery(r, "subcategory_id", 0),
+		Search:        strings.TrimSpace(r.URL.Query().Get("search")),
+		Year:          parseIntQuery(r, "year", 0),
+		Month:         parseIntQuery(r, "month", 0),
+		Limit:         parseIntQuery(r, "limit", 50),
+		Offset:        parseIntQuery(r, "offset", 0),
 	}
 
 	result, err := h.ticketRepo.ListStaffTickets(r.Context(), filter)

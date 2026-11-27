@@ -16,6 +16,7 @@ import {
   ReporterType,
   Room,
   StaffRole,
+  Subcategory,
   Technician,
   Ticket,
   TicketStatus,
@@ -152,10 +153,15 @@ export async function fetchPublicMasterData(): Promise<PublicMasterDataResponse>
 
 export async function checkDuplicateTicket(
   roomId: number,
-  categoryId: number
+  categoryId: number,
+  subcategoryId?: number
 ): Promise<DuplicateCheckResponse> {
   return apiRequest<DuplicateCheckResponse>('/api/public/tickets/check-duplicate', {
-    query: { room_id: roomId, category_id: categoryId },
+    query: {
+      room_id: roomId,
+      category_id: categoryId,
+      subcategory_id: subcategoryId && subcategoryId > 0 ? subcategoryId : undefined,
+    },
   });
 }
 
@@ -165,6 +171,7 @@ export interface CreatePublicTicketPayload {
   room_id: number;
   location_detail?: string;
   category_id: number;
+  subcategory_id?: number;
   reporter_type_id: number;
   description: string;
   website_honeypot?: string;
@@ -182,6 +189,9 @@ export async function createPublicTicket(
     formData.append('location_detail', payload.location_detail.trim());
   }
   formData.append('category_id', String(payload.category_id));
+  if (payload.subcategory_id && payload.subcategory_id > 0) {
+    formData.append('subcategory_id', String(payload.subcategory_id));
+  }
   formData.append('reporter_type_id', String(payload.reporter_type_id));
   formData.append('description', payload.description.trim());
 
@@ -538,6 +548,47 @@ export async function adminUpdateCategory(
   }
 ): Promise<Category> {
   return apiRequest<Category>(`/api/admin/categories/${id}`, {
+    method: 'PUT',
+    requiresAuth: true,
+    body: data,
+  });
+}
+
+export async function adminListSubcategories(categoryId?: number): Promise<Subcategory[]> {
+  const res = await apiRequest<{ items: Subcategory[] }>('/api/admin/subcategories', {
+    requiresAuth: true,
+    query: categoryId && categoryId > 0 ? { category_id: categoryId } : undefined,
+  });
+  return res.items || [];
+}
+
+export async function adminCreateSubcategory(data: {
+  category_id: number;
+  code: string;
+  name: string;
+  description: string;
+  sort_order: number;
+  is_active: boolean;
+}): Promise<Subcategory> {
+  return apiRequest<Subcategory>('/api/admin/subcategories', {
+    method: 'POST',
+    requiresAuth: true,
+    body: data,
+  });
+}
+
+export async function adminUpdateSubcategory(
+  id: number,
+  data: {
+    category_id: number;
+    code: string;
+    name: string;
+    description: string;
+    sort_order: number;
+    is_active: boolean;
+  }
+): Promise<Subcategory> {
+  return apiRequest<Subcategory>(`/api/admin/subcategories/${id}`, {
     method: 'PUT',
     requiresAuth: true,
     body: data,

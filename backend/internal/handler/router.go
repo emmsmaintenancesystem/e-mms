@@ -124,6 +124,10 @@ func NewRouter(deps RouterDependencies) http.Handler {
 			adm.Post("/categories", adminHandler.CreateCategory)
 			adm.Put("/categories/{id}", adminHandler.UpdateCategory)
 
+			adm.Get("/subcategories", adminHandler.ListSubcategories)
+			adm.Post("/subcategories", adminHandler.CreateSubcategory)
+			adm.Put("/subcategories/{id}", adminHandler.UpdateSubcategory)
+
 			adm.Get("/reporter-types", adminHandler.ListReporterTypes)
 			adm.Post("/reporter-types", adminHandler.CreateReporterType)
 			adm.Put("/reporter-types/{id}", adminHandler.UpdateReporterType)

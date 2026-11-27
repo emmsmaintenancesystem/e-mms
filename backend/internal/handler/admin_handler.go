@@ -366,6 +366,97 @@ func (h *AdminHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 // =============================================================================
+// 4.1 Subcategories (หมวดหมู่ย่อย / รายการอุปกรณ์)
+// =============================================================================
+
+type subcategoryPayload struct {
+	CategoryID  int    `json:"category_id"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	SortOrder   int    `json:"sort_order"`
+	IsActive    *bool  `json:"is_active"`
+}
+
+func (h *AdminHandler) ListSubcategories(w http.ResponseWriter, r *http.Request) {
+	categoryID := parseIntQuery(r, "category_id", 0)
+	items, err := h.masterRepo.ListSubcategories(r.Context(), categoryID)
+	if err != nil {
+		HandleRepoError(w, err, "")
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func (h *AdminHandler) CreateSubcategory(w http.ResponseWriter, r *http.Request) {
+	var req subcategoryPayload
+	if err := DecodeJSON(r, &req); err != nil {
+		WriteError(w, http.StatusBadRequest, "รูปแบบข้อมูลไม่ถูกต้อง")
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if req.CategoryID <= 0 || name == "" {
+		WriteError(w, http.StatusBadRequest, "กรุณาเลือกหมวดหมู่หลักและระบุชื่อหมวดหมู่ย่อย/รายการอุปกรณ์")
+		return
+	}
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	created, err := h.masterRepo.CreateSubcategory(r.Context(), &model.Subcategory{
+		CategoryID:  req.CategoryID,
+		Code:        strPtrOrNil(req.Code),
+		Name:        name,
+		Description: strPtrOrNil(req.Description),
+		SortOrder:   req.SortOrder,
+		IsActive:    isActive,
+	})
+	if err != nil {
+		HandleRepoError(w, err, "")
+		return
+	}
+	WriteJSON(w, http.StatusCreated, created)
+}
+
+func (h *AdminHandler) UpdateSubcategory(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(strings.TrimSpace(chi.URLParam(r, "id")))
+	if err != nil || id <= 0 {
+		WriteError(w, http.StatusBadRequest, "รหัสหมวดหมู่ย่อยไม่ถูกต้อง")
+		return
+	}
+	var req subcategoryPayload
+	if err := DecodeJSON(r, &req); err != nil {
+		WriteError(w, http.StatusBadRequest, "รูปแบบข้อมูลไม่ถูกต้อง")
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if req.CategoryID <= 0 || name == "" {
+		WriteError(w, http.StatusBadRequest, "กรุณาเลือกหมวดหมู่หลักและระบุชื่อหมวดหมู่ย่อย/รายการอุปกรณ์")
+		return
+	}
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	updated, err := h.masterRepo.UpdateSubcategory(r.Context(), &model.Subcategory{
+		ID:          id,
+		CategoryID:  req.CategoryID,
+		Code:        strPtrOrNil(req.Code),
+		Name:        name,
+		Description: strPtrOrNil(req.Description),
+		SortOrder:   req.SortOrder,
+		IsActive:    isActive,
+	})
+	if err != nil {
+		HandleRepoError(w, err, "ไม่พบหมวดหมู่ย่อยที่ต้องการแก้ไข")
+		return
+	}
+	WriteJSON(w, http.StatusOK, updated)
+}
+
+// =============================================================================
 // 5. Reporter Types (ประเภทผู้แจ้งซ่อม — Zero PII)
 // =============================================================================
 

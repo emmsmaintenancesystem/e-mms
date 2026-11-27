@@ -50,6 +50,7 @@ func (m *mockMasterRepo) GetPublicMasterData(ctx context.Context) (*model.Public
 		Floors:        []model.Floor{{ID: 1, BuildingID: 1, Name: "ชั้น 1", IsActive: true}},
 		Rooms:         []model.Room{{ID: 1, FloorID: 1, BuildingID: 1, Name: "ห้อง 101", IsActive: true}},
 		Categories:    []model.Category{{ID: 1, Name: "ระบบไฟฟ้า", IsActive: true}},
+		Subcategories: []model.Subcategory{{ID: 1, CategoryID: 1, Name: "หลอดไฟ / โคมไฟ", IsActive: true}},
 		ReporterTypes: []model.ReporterType{{ID: 1, Name: "เจ้าหน้าที่", IsActive: true}},
 	}, nil
 }
@@ -108,6 +109,16 @@ func (m *mockMasterRepo) CreateCategory(ctx context.Context, c *model.Category) 
 }
 func (m *mockMasterRepo) UpdateCategory(ctx context.Context, c *model.Category) (*model.Category, error) {
 	return c, nil
+}
+func (m *mockMasterRepo) ListSubcategories(ctx context.Context, categoryID int) ([]model.Subcategory, error) {
+	return []model.Subcategory{{ID: 1, CategoryID: 1, Name: "หลอดไฟ / โคมไฟ", IsActive: true}}, nil
+}
+func (m *mockMasterRepo) CreateSubcategory(ctx context.Context, sc *model.Subcategory) (*model.Subcategory, error) {
+	sc.ID = 2
+	return sc, nil
+}
+func (m *mockMasterRepo) UpdateSubcategory(ctx context.Context, sc *model.Subcategory) (*model.Subcategory, error) {
+	return sc, nil
 }
 func (m *mockMasterRepo) ListReporterTypes(ctx context.Context) ([]model.ReporterType, error) {
 	return nil, nil
@@ -172,18 +183,23 @@ func newMockTicketRepo() *mockTicketRepo {
 	}
 }
 
-func (m *mockTicketRepo) CheckDuplicate(ctx context.Context, roomID int, categoryID int) ([]model.DuplicateTicketSummary, error) {
+func (m *mockTicketRepo) CheckDuplicate(ctx context.Context, roomID int, categoryID int, subcategoryID int) ([]model.DuplicateTicketSummary, error) {
 	var out []model.DuplicateTicketSummary
 	for _, t := range m.tickets {
 		if t.RoomID == roomID && t.CategoryID == categoryID && model.IsOpenStatus(t.Status) {
+			if subcategoryID > 0 && (t.SubcategoryID == nil || *t.SubcategoryID != subcategoryID) {
+				continue
+			}
 			out = append(out, model.DuplicateTicketSummary{
-				TicketCode:   t.TicketCode,
-				Status:       t.Status,
-				StatusLabel:  t.StatusLabel,
-				RoomName:     t.RoomName,
-				CategoryName: t.CategoryName,
-				Description:  t.Description,
-				CreatedAt:    t.CreatedAt,
+				TicketCode:      t.TicketCode,
+				Status:          t.Status,
+				StatusLabel:     t.StatusLabel,
+				RoomName:        t.RoomName,
+				CategoryName:    t.CategoryName,
+				SubcategoryID:   t.SubcategoryID,
+				SubcategoryName: t.SubcategoryName,
+				Description:     t.Description,
+				CreatedAt:       t.CreatedAt,
 			})
 		}
 	}

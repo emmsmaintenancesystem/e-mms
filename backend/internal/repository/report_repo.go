@@ -50,6 +50,7 @@ func (r *pgReportRepo) GetReportSummary(ctx context.Context, filter model.Report
 		StatusBreakdown:     make([]model.StatusStatItem, 0, 6),
 		MonthlyTrend:        make([]model.MonthlyTrendItem, 12),
 		ByCategory:          make([]model.CategoryStatItem, 0),
+		BySubcategory:       make([]model.SubcategoryStatItem, 0),
 		ByBuilding:          make([]model.BuildingStatItem, 0),
 		TopRooms:            make([]model.RoomHotspotItem, 0),
 		ExecutiveMatrix:     make([]model.ExecutiveMatrixRow, 0),
@@ -210,6 +211,49 @@ func (r *pgReportRepo) GetReportSummary(ctx context.Context, filter model.Report
 		resp.ByCategory = append(resp.ByCategory, item)
 	}
 	if err := cRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 4.1 Breakdown by Subcategory (สถิติเจาะลึกหมวดหมู่ย่อย / รายการอุปกรณ์)
+	subCatSQL := `
+		SELECT
+			sc.id, sc.category_id, c.name AS category_name, COALESCE(sc.code, ''), sc.name,
+			COUNT(t.id) AS total,
+			COUNT(t.id) FILTER (WHERE t.status IN ('pending', 'in_progress', 'waiting_parts')) AS open_backlog,
+			COUNT(t.id) FILTER (WHERE t.status = 'completed') AS completed,
+			COUNT(t.id) FILTER (WHERE t.status = 'unrepairable') AS unrepairable,
+			COUNT(t.id) FILTER (WHERE t.status = 'cancelled') AS cancelled
+		FROM subcategories sc
+		JOIN categories c ON c.id = sc.category_id
+		LEFT JOIN tickets t ON t.subcategory_id = sc.id
+			AND EXTRACT(YEAR FROM t.created_at AT TIME ZONE 'Asia/Bangkok')::int = $1
+			AND ($2::int = 0 OR EXTRACT(MONTH FROM t.created_at AT TIME ZONE 'Asia/Bangkok')::int = $2)
+			AND ($3::int = 0 OR t.building_id = $3)
+			AND ($4::text = '' OR t.status = $4)
+		WHERE ($5::int = 0 OR sc.category_id = $5)
+		  AND (sc.is_active = true OR t.id IS NOT NULL)
+		GROUP BY sc.id, sc.category_id, c.name, c.sort_order, sc.code, sc.name, sc.sort_order
+		ORDER BY total DESC, c.sort_order ASC, sc.sort_order ASC, sc.id ASC
+	`
+	scRows, err := r.pool.Query(ctx, subCatSQL, filter.Year, filter.Month, filter.BuildingID, filter.Status, filter.CategoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer scRows.Close()
+	for scRows.Next() {
+		var item model.SubcategoryStatItem
+		if err := scRows.Scan(
+			&item.SubcategoryID, &item.CategoryID, &item.CategoryName, &item.SubcategoryCode, &item.SubcategoryName,
+			&item.Total, &item.OpenBacklog, &item.Completed, &item.Unrepairable, &item.Cancelled,
+		); err != nil {
+			return nil, err
+		}
+		if ov.TotalTickets > 0 {
+			item.Percentage = round2(float64(item.Total) * 100.0 / float64(ov.TotalTickets))
+		}
+		resp.BySubcategory = append(resp.BySubcategory, item)
+	}
+	if err := scRows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -476,6 +520,7 @@ func (r *pgReportRepo) ListTicketsForExport(ctx context.Context, filter model.Re
 			rm.name AS room_name,
 			COALESCE(t.location_detail, ''),
 			c.name AS category_name,
+			COALESCE(sc.name, '') AS subcategory_name,
 			rt.name AS reporter_type_name,
 			t.description,
 			t.status,
@@ -493,6 +538,7 @@ func (r *pgReportRepo) ListTicketsForExport(ctx context.Context, filter model.Re
 		JOIN floors f ON f.id = t.floor_id
 		JOIN rooms rm ON rm.id = t.room_id
 		JOIN categories c ON c.id = t.category_id
+		LEFT JOIN subcategories sc ON sc.id = t.subcategory_id
 		JOIN reporter_types rt ON rt.id = t.reporter_type_id
 		WHERE EXTRACT(YEAR FROM t.created_at AT TIME ZONE 'Asia/Bangkok')::int = $1
 		  AND ($2::int = 0 OR EXTRACT(MONTH FROM t.created_at AT TIME ZONE 'Asia/Bangkok')::int = $2)
@@ -521,6 +567,7 @@ func (r *pgReportRepo) ListTicketsForExport(ctx context.Context, filter model.Re
 			&row.RoomName,
 			&row.LocationDetail,
 			&row.CategoryName,
+			&row.SubcategoryName,
 			&row.ReporterTypeName,
 			&row.Description,
 			&row.Status,

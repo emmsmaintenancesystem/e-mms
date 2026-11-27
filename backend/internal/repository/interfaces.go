@@ -51,6 +51,11 @@ type MasterRepository interface {
 	CreateCategory(ctx context.Context, c *model.Category) (*model.Category, error)
 	UpdateCategory(ctx context.Context, c *model.Category) (*model.Category, error)
 
+	// Admin CRUD: Subcategories
+	ListSubcategories(ctx context.Context, categoryID int) ([]model.Subcategory, error)
+	CreateSubcategory(ctx context.Context, sc *model.Subcategory) (*model.Subcategory, error)
+	UpdateSubcategory(ctx context.Context, sc *model.Subcategory) (*model.Subcategory, error)
+
 	// Admin CRUD: Reporter Types
 	ListReporterTypes(ctx context.Context) ([]model.ReporterType, error)
 	CreateReporterType(ctx context.Context, rt *model.ReporterType) (*model.ReporterType, error)
@@ -70,7 +75,7 @@ type MasterRepository interface {
 
 // TicketRepository defines operations for tickets, duplicate check, public board, and status transitions.
 type TicketRepository interface {
-	CheckDuplicate(ctx context.Context, roomID int, categoryID int) ([]model.DuplicateTicketSummary, error)
+	CheckDuplicate(ctx context.Context, roomID int, categoryID int, subcategoryID int) ([]model.DuplicateTicketSummary, error)
 	CreateTicket(ctx context.Context, input model.CreateTicketInput) (*model.Ticket, error)
 	GetByCode(ctx context.Context, ticketCode string) (*model.Ticket, error)
 	GetByID(ctx context.Context, id int) (*model.Ticket, error)

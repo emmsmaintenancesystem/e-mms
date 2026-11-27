@@ -39,6 +39,7 @@ import {
   STATUS_META,
   Ticket,
   TicketPhoto,
+  formatCategoryWithSub,
   formatThaiDateTime,
 } from '../types/api';
 
@@ -89,7 +90,10 @@ export const PublicTrackPage: React.FC = () => {
       const updated = saveLocalTicket({
         ticket_code: ticket.ticket_code,
         location_summary: `${ticket.building_name} • ${ticket.floor_name} • ${ticket.room_name}`,
-        category_name: ticket.category_name,
+        category_name: formatCategoryWithSub(
+          ticket.category_name,
+          ticket.subcategory_name
+        ),
         status: ticket.status,
         created_at: ticket.created_at,
       });
@@ -363,7 +367,10 @@ export const PublicTrackPage: React.FC = () => {
                   <Wrench className="w-4 h-4 text-[#2F6BFF] shrink-0" />
                   <span className="text-xs text-[#9BA3B8]">หมวดหมู่:</span>
                   <span className="font-semibold text-[#F3F5FA]">
-                    {trackedTicket.category_name}
+                    {formatCategoryWithSub(
+                      trackedTicket.category_name,
+                      trackedTicket.subcategory_name
+                    )}
                   </span>
                 </div>
 
@@ -645,7 +652,13 @@ export const PublicTrackPage: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-[#9BA3B8] pt-1 border-t border-[#1E2235]">
-                    <span>หมวด: {item.category_name}</span>
+                    <span>
+                      หมวด:{' '}
+                      {formatCategoryWithSub(
+                        item.category_name,
+                        item.subcategory_name
+                      )}
+                    </span>
                     <span>{formatThaiDateTime(item.created_at)}</span>
                   </div>
                 </div>
@@ -691,7 +704,10 @@ export const PublicTrackPage: React.FC = () => {
                         )}
                       </td>
                       <td className="py-3 px-3 text-[#F3F5FA] whitespace-nowrap">
-                        {item.category_name}
+                        {formatCategoryWithSub(
+                          item.category_name,
+                          item.subcategory_name
+                        )}
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         <StatusBadge status={item.status} short />

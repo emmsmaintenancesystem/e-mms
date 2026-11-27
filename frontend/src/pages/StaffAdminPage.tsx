@@ -24,6 +24,7 @@ import {
   adminCreateFloor,
   adminCreateReporterType,
   adminCreateRoom,
+  adminCreateSubcategory,
   adminCreateTechnician,
   adminCreateUser,
   adminListBuildings,
@@ -31,6 +32,7 @@ import {
   adminListFloors,
   adminListReporterTypes,
   adminListRooms,
+  adminListSubcategories,
   adminListTechnicians,
   adminListUsers,
   adminResetUserPassword,
@@ -39,6 +41,7 @@ import {
   adminUpdateFloor,
   adminUpdateReporterType,
   adminUpdateRoom,
+  adminUpdateSubcategory,
   adminUpdateTechnician,
   adminUpdateUser,
 } from '../lib/apiClient';
@@ -50,6 +53,7 @@ import {
   ReporterType,
   Room,
   StaffRole,
+  Subcategory,
   Technician,
   User,
   formatThaiDateTime,
@@ -60,6 +64,7 @@ type AdminTab =
   | 'floors'
   | 'rooms'
   | 'categories'
+  | 'subcategories'
   | 'reporter_types'
   | 'technicians'
   | 'users';
@@ -77,13 +82,15 @@ export const StaffAdminPage: React.FC = () => {
   const [floors, setFloors] = useState<Floor[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [reporterTypes, setReporterTypes] = useState<ReporterType[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [users, setUsers] = useState<User[]>([]);
 
-  // Filters for Floors & Rooms tab
+  // Filters for Floors, Rooms & Subcategories tab
   const [filterBuildingId, setFilterBuildingId] = useState<number>(0);
   const [filterFloorId, setFilterFloorId] = useState<number>(0);
+  const [filterCategoryId, setFilterCategoryId] = useState<number>(0);
 
   // Edit / Create Form State
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -95,6 +102,7 @@ export const StaffAdminPage: React.FC = () => {
   const [fDescription, setFDescription] = useState<string>('');
   const [fBuildingId, setFBuildingId] = useState<number>(0);
   const [fFloorId, setFFloorId] = useState<number>(0);
+  const [fCategoryId, setFCategoryId] = useState<number>(0);
   const [fSortOrder, setFSortOrder] = useState<number>(10);
   const [fIsActive, setFIsActive] = useState<boolean>(true);
 
@@ -117,12 +125,13 @@ export const StaffAdminPage: React.FC = () => {
   const loadAllAdminData = async () => {
     setIsLoading(true);
     try {
-      const [bList, flList, rList, cList, rtList, tList, uList] =
+      const [bList, flList, rList, cList, scList, rtList, tList, uList] =
         await Promise.all([
           adminListBuildings(),
           adminListFloors(),
           adminListRooms(),
           adminListCategories(),
+          adminListSubcategories(),
           adminListReporterTypes(),
           adminListTechnicians(),
           adminListUsers(),
@@ -131,6 +140,7 @@ export const StaffAdminPage: React.FC = () => {
       setFloors(flList);
       setRooms(rList);
       setCategories(cList);
+      setSubcategories(scList);
       setReporterTypes(rtList);
       setTechnicians(tList);
       setUsers(uList);
@@ -158,6 +168,7 @@ export const StaffAdminPage: React.FC = () => {
     setFDescription('');
     setFBuildingId(buildings[0]?.id || 0);
     setFFloorId(floors[0]?.id || 0);
+    setFCategoryId(categories[0]?.id || 0);
     setFSortOrder(10);
     setFIsActive(true);
     setFNickname('');
@@ -248,6 +259,26 @@ export const StaffAdminPage: React.FC = () => {
           });
         } else {
           await adminCreateCategory({
+            code: fCode.trim(),
+            name: fName.trim(),
+            description: fDescription.trim(),
+            sort_order: fSortOrder,
+            is_active: fIsActive,
+          });
+        }
+      } else if (activeTab === 'subcategories') {
+        if (editingId) {
+          await adminUpdateSubcategory(editingId, {
+            category_id: fCategoryId,
+            code: fCode.trim(),
+            name: fName.trim(),
+            description: fDescription.trim(),
+            sort_order: fSortOrder,
+            is_active: fIsActive,
+          });
+        } else {
+          await adminCreateSubcategory({
+            category_id: fCategoryId,
             code: fCode.trim(),
             name: fName.trim(),
             description: fDescription.trim(),
@@ -381,9 +412,15 @@ export const StaffAdminPage: React.FC = () => {
     },
     {
       id: 'categories',
-      label: 'หมวดหมู่งานซ่อม',
+      label: 'หมวดหมู่หลัก',
       count: categories.length,
       icon: <Tag className="w-4 h-4" />,
+    },
+    {
+      id: 'subcategories',
+      label: 'หมวดหมู่ย่อย / อุปกรณ์',
+      count: subcategories.length,
+      icon: <Layers className="w-4 h-4" />,
     },
     {
       id: 'reporter_types',
@@ -418,6 +455,11 @@ export const StaffAdminPage: React.FC = () => {
       return true;
     });
   }, [rooms, filterBuildingId, filterFloorId]);
+
+  const filteredSubcategories = useMemo(() => {
+    if (filterCategoryId <= 0) return subcategories;
+    return subcategories.filter((sc) => sc.category_id === filterCategoryId);
+  }, [subcategories, filterCategoryId]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8 space-y-6">
@@ -679,7 +721,7 @@ export const StaffAdminPage: React.FC = () => {
             <>
               <div>
                 <label className="block text-xs font-semibold text-[#9BA3B8] mb-1">
-                  รหัสหมวดหมู่ (เช่น ELEC, AIR)
+                  รหัสหมวดหมู่หลัก (เช่น ELEC, AIR)
                 </label>
                 <input
                   type="text"
@@ -691,7 +733,7 @@ export const StaffAdminPage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#9BA3B8] mb-1">
-                  ชื่อหมวดหมู่งานซ่อม <span className="text-[#FF7A1A]">*</span>
+                  ชื่อหมวดหมู่งานซ่อมหลัก <span className="text-[#FF7A1A]">*</span>
                 </label>
                 <input
                   type="text"
@@ -711,6 +753,66 @@ export const StaffAdminPage: React.FC = () => {
                   value={fDescription}
                   onChange={(e) => setFDescription(e.target.value)}
                   placeholder="เช่น หลอดไฟเสีย, ปลั๊กไฟชำรุด, เบรกเกอร์ทริป"
+                  className="emms-input text-xs"
+                />
+              </div>
+            </>
+          )}
+
+          {activeTab === 'subcategories' && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-[#9BA3B8] mb-1">
+                  สังกัดหมวดหมู่หลัก <span className="text-[#FF7A1A]">*</span>
+                </label>
+                <select
+                  value={fCategoryId}
+                  onChange={(e) => setFCategoryId(Number(e.target.value))}
+                  className="emms-select text-xs"
+                  required
+                >
+                  <option value={0}>-- เลือกหมวดหมู่หลัก --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#9BA3B8] mb-1">
+                  รหัสหมวดหมู่ย่อย (ไม่บังคับ เช่น ELEC-BULB)
+                </label>
+                <input
+                  type="text"
+                  value={fCode}
+                  onChange={(e) => setFCode(e.target.value)}
+                  placeholder="เช่น ELEC-BULB"
+                  className="emms-input text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#9BA3B8] mb-1">
+                  ชื่อหมวดหมู่ย่อย / รายการอุปกรณ์ <span className="text-[#FF7A1A]">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={fName}
+                  onChange={(e) => setFName(e.target.value)}
+                  placeholder="เช่น หลอดไฟ / โคมไฟ, ปลั๊กไฟ / เต้ารับ, สวิตช์ไฟ"
+                  className="emms-input text-xs"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#9BA3B8] mb-1">
+                  คำอธิบายตัวอย่างอาการย่อย
+                </label>
+                <textarea
+                  rows={2}
+                  value={fDescription}
+                  onChange={(e) => setFDescription(e.target.value)}
+                  placeholder="เช่น หลอดไฟดับ, หลอดไฟกะพริบ, โคมไฟชำรุด"
                   className="emms-input text-xs"
                 />
               </div>
@@ -913,7 +1015,7 @@ export const StaffAdminPage: React.FC = () => {
 
         {/* Data Table Card */}
         <div className="emms-card p-5 lg:col-span-2 space-y-4">
-          {/* Sub-Filters for Floors & Rooms */}
+          {/* Sub-Filters for Floors, Rooms & Subcategories */}
           {(activeTab === 'floors' || activeTab === 'rooms') && (
             <div className="flex items-center gap-3 flex-wrap pb-3 border-b border-[#1E2235]">
               <select
@@ -947,6 +1049,23 @@ export const StaffAdminPage: React.FC = () => {
                   ))}
                 </select>
               )}
+            </div>
+          )}
+
+          {activeTab === 'subcategories' && (
+            <div className="flex items-center gap-3 flex-wrap pb-3 border-b border-[#1E2235]">
+              <select
+                value={filterCategoryId}
+                onChange={(e) => setFilterCategoryId(Number(e.target.value))}
+                className="emms-select text-xs py-1.5 w-auto"
+              >
+                <option value={0}>กรอง: ทุกหมวดหมู่หลัก ({subcategories.length} รายการย่อย)</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -1132,7 +1251,7 @@ export const StaffAdminPage: React.FC = () => {
                   <thead>
                     <tr className="border-b border-[#1E2235] text-[#9BA3B8]">
                       <th className="py-2.5 px-3 text-left">รหัส</th>
-                      <th className="py-2.5 px-3 text-left">ชื่อหมวดหมู่</th>
+                      <th className="py-2.5 px-3 text-left">ชื่อหมวดหมู่หลัก</th>
                       <th className="py-2.5 px-3 text-left">คำอธิบาย</th>
                       <th className="py-2.5 px-2 text-center">สถานะ</th>
                       <th className="py-2.5 px-3 text-right">จัดการ</th>
@@ -1166,6 +1285,72 @@ export const StaffAdminPage: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setEditingId(item.id);
+                              setFCode(item.code || '');
+                              setFName(item.name);
+                              setFDescription(item.description || '');
+                              setFSortOrder(item.sort_order);
+                              setFIsActive(item.is_active);
+                            }}
+                            className="inline-flex items-center gap-1 text-[#5A8BFF] hover:underline font-semibold"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            แก้ไข
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {/* 4.1 Subcategories Table */}
+              {activeTab === 'subcategories' && (
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#1E2235] text-[#9BA3B8]">
+                      <th className="py-2.5 px-3 text-left">หมวดหมู่หลัก</th>
+                      <th className="py-2.5 px-3 text-left">ชื่อหมวดหมู่ย่อย / อุปกรณ์</th>
+                      <th className="py-2.5 px-3 text-left">ตัวอย่างอาการ</th>
+                      <th className="py-2.5 px-2 text-center">ลำดับ</th>
+                      <th className="py-2.5 px-2 text-center">สถานะ</th>
+                      <th className="py-2.5 px-3 text-right">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1E2235]">
+                    {filteredSubcategories.map((item) => (
+                      <tr key={item.id} className="hover:bg-[#171A29]">
+                        <td className="py-2.5 px-3 text-[#5A8BFF] font-medium">
+                          {item.category_name || `หมวด #${item.category_id}`}
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold text-[#F3F5FA]">
+                          {item.name}
+                          {item.code && (
+                            <span className="ml-1.5 font-mono text-[11px] text-[#9BA3B8]">
+                              ({item.code})
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-[#9BA3B8]">
+                          {item.description || '-'}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">{item.sort_order}</td>
+                        <td className="py-2.5 px-2 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                              item.is_active
+                                ? 'bg-emerald-500/15 text-emerald-400'
+                                : 'bg-rose-500/15 text-rose-400'
+                            }`}
+                          >
+                            {item.is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(item.id);
+                              setFCategoryId(item.category_id);
                               setFCode(item.code || '');
                               setFName(item.name);
                               setFDescription(item.description || '');

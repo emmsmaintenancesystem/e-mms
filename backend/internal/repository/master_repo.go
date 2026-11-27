@@ -46,6 +46,10 @@ func (r *pgMasterRepo) GetPublicMasterData(ctx context.Context) (*model.PublicMa
 	if err != nil {
 		return nil, err
 	}
+	subcategories, err := r.listSubcategoriesInternal(ctx, 0, true)
+	if err != nil {
+		return nil, err
+	}
 	reporterTypes, err := r.listReporterTypesByActive(ctx, true)
 	if err != nil {
 		return nil, err
@@ -56,6 +60,7 @@ func (r *pgMasterRepo) GetPublicMasterData(ctx context.Context) (*model.PublicMa
 		Floors:        floors,
 		Rooms:         rooms,
 		Categories:    categories,
+		Subcategories: subcategories,
 		ReporterTypes: reporterTypes,
 	}, nil
 }
@@ -383,6 +388,88 @@ func (r *pgMasterRepo) UpdateCategory(ctx context.Context, c *model.Category) (*
 	var out model.Category
 	err := r.pool.QueryRow(ctx, query, cleanNullStr(c.Code), strings.TrimSpace(c.Name), cleanNullStr(c.Description), c.SortOrder, c.IsActive, c.ID).
 		Scan(&out.ID, &out.Code, &out.Name, &out.Description, &out.SortOrder, &out.IsActive, &out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		return nil, mapPgError(err)
+	}
+	return &out, nil
+}
+
+// =============================================================================
+// 6.1 Subcategories CRUD
+// =============================================================================
+
+func (r *pgMasterRepo) ListSubcategories(ctx context.Context, categoryID int) ([]model.Subcategory, error) {
+	return r.listSubcategoriesInternal(ctx, categoryID, false)
+}
+
+func (r *pgMasterRepo) listSubcategoriesInternal(ctx context.Context, categoryID int, onlyActive bool) ([]model.Subcategory, error) {
+	query := `
+		SELECT sc.id, sc.category_id, c.name AS category_name,
+		       sc.code, sc.name, sc.description, sc.sort_order, sc.is_active, sc.created_at, sc.updated_at
+		FROM subcategories sc
+		JOIN categories c ON c.id = sc.category_id
+		WHERE ($1::int = 0 OR sc.category_id = $1)
+		  AND ($2::boolean = false OR (sc.is_active = true AND c.is_active = true))
+		ORDER BY c.sort_order ASC, sc.sort_order ASC, sc.id ASC
+	`
+	rows, err := r.pool.Query(ctx, query, categoryID, onlyActive)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]model.Subcategory, 0)
+	for rows.Next() {
+		var sc model.Subcategory
+		if err := rows.Scan(
+			&sc.ID, &sc.CategoryID, &sc.CategoryName,
+			&sc.Code, &sc.Name, &sc.Description, &sc.SortOrder, &sc.IsActive, &sc.CreatedAt, &sc.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, sc)
+	}
+	return result, rows.Err()
+}
+
+func (r *pgMasterRepo) CreateSubcategory(ctx context.Context, sc *model.Subcategory) (*model.Subcategory, error) {
+	query := `
+		INSERT INTO subcategories (category_id, code, name, description, sort_order, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, category_id, code, name, description, sort_order, is_active, created_at, updated_at
+	`
+	var out model.Subcategory
+	err := r.pool.QueryRow(ctx, query,
+		sc.CategoryID,
+		cleanNullStr(sc.Code),
+		strings.TrimSpace(sc.Name),
+		cleanNullStr(sc.Description),
+		sc.SortOrder,
+		sc.IsActive,
+	).Scan(&out.ID, &out.CategoryID, &out.Code, &out.Name, &out.Description, &out.SortOrder, &out.IsActive, &out.CreatedAt, &out.UpdatedAt)
+	if err != nil {
+		return nil, mapPgError(err)
+	}
+	return &out, nil
+}
+
+func (r *pgMasterRepo) UpdateSubcategory(ctx context.Context, sc *model.Subcategory) (*model.Subcategory, error) {
+	query := `
+		UPDATE subcategories
+		SET category_id = $1, code = $2, name = $3, description = $4, sort_order = $5, is_active = $6
+		WHERE id = $7
+		RETURNING id, category_id, code, name, description, sort_order, is_active, created_at, updated_at
+	`
+	var out model.Subcategory
+	err := r.pool.QueryRow(ctx, query,
+		sc.CategoryID,
+		cleanNullStr(sc.Code),
+		strings.TrimSpace(sc.Name),
+		cleanNullStr(sc.Description),
+		sc.SortOrder,
+		sc.IsActive,
+		sc.ID,
+	).Scan(&out.ID, &out.CategoryID, &out.Code, &out.Name, &out.Description, &out.SortOrder, &out.IsActive, &out.CreatedAt, &out.UpdatedAt)
 	if err != nil {
 		return nil, mapPgError(err)
 	}

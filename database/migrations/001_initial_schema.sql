@@ -128,7 +128,7 @@ CREATE TRIGGER trg_rooms_updated_at
 -- 4. ข้อมูลหลัก: หมวดหมู่งานซ่อม และ ประเภทผู้แจ้งซ่อม (Zero PII)
 -- =============================================================================
 
--- Table 5/12: categories (หมวดหมู่งานซ่อม)
+-- Table 5/13: categories (หมวดหมู่งานซ่อมหลัก)
 CREATE TABLE IF NOT EXISTS categories (
     id          SERIAL PRIMARY KEY,
     code        VARCHAR(30) UNIQUE,
@@ -140,11 +140,33 @@ CREATE TABLE IF NOT EXISTS categories (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE categories IS 'ตารางข้อมูลหลัก: หมวดหมู่งานซ่อมบำรุง';
+COMMENT ON TABLE categories IS 'ตารางข้อมูลหลัก: หมวดหมู่งานซ่อมบำรุงหลัก (ระดับที่ 1)';
 
 DROP TRIGGER IF EXISTS trg_categories_updated_at ON categories;
 CREATE TRIGGER trg_categories_updated_at
     BEFORE UPDATE ON categories
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Table 6/13: subcategories (หมวดหมู่ย่อย / รายการอุปกรณ์)
+CREATE TABLE IF NOT EXISTS subcategories (
+    id          SERIAL PRIMARY KEY,
+    category_id INT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+    code        VARCHAR(40) UNIQUE,
+    name        VARCHAR(120) NOT NULL,
+    description VARCHAR(255),
+    sort_order  INT NOT NULL DEFAULT 0,
+    is_active   BOOLEAN NOT NULL DEFAULT true,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_subcategories_category_name UNIQUE (category_id, name),
+    CONSTRAINT uq_subcategories_id_category UNIQUE (id, category_id)
+);
+
+COMMENT ON TABLE subcategories IS 'ตารางข้อมูลหลัก: หมวดหมู่ย่อย/รายการอุปกรณ์ เชื่อมกับหมวดหมู่หลัก (ระดับที่ 2)';
+
+DROP TRIGGER IF EXISTS trg_subcategories_updated_at ON subcategories;
+CREATE TRIGGER trg_subcategories_updated_at
+    BEFORE UPDATE ON subcategories
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- Table 6/12: reporter_types (ประเภทผู้แจ้งซ่อม — ไม่เก็บข้อมูลส่วนบุคคลตามหลัก PDPA)
@@ -223,6 +245,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     room_id                 INT NOT NULL REFERENCES rooms(id) ON DELETE RESTRICT,
     location_detail         VARCHAR(200),
     category_id             INT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+    subcategory_id          INT REFERENCES subcategories(id) ON DELETE RESTRICT,
     reporter_type_id        INT NOT NULL REFERENCES reporter_types(id) ON DELETE RESTRICT,
     description             TEXT NOT NULL CHECK (length(btrim(description)) > 0),
     status                  VARCHAR(20) NOT NULL DEFAULT 'pending'
@@ -247,6 +270,8 @@ CREATE TABLE IF NOT EXISTS tickets (
         FOREIGN KEY (floor_id, building_id) REFERENCES floors(id, building_id) ON DELETE RESTRICT,
     CONSTRAINT fk_tickets_room_floor
         FOREIGN KEY (room_id, floor_id) REFERENCES rooms(id, floor_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_tickets_subcategory_category
+        FOREIGN KEY (subcategory_id, category_id) REFERENCES subcategories(id, category_id) ON DELETE RESTRICT,
 
     -- บังคับกรอกเหตุผลเสมอเมื่อสถานะเป็น unrepairable (ซ่อมไม่ได้) หรือ cancelled (ยกเลิก)
     CONSTRAINT chk_tickets_reason_required
@@ -328,10 +353,17 @@ COMMENT ON TABLE ticket_status_logs IS 'ตารางบันทึกปร�
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_ticket_code
     ON tickets (ticket_code);
 
--- Index 2: ตรวจสอบการแจ้งซ้ำแบบ Real-time (ห้องเดียวกัน + หมวดหมู่เดียวกัน ที่ยังเปิดค้างอยู่)
+-- Index 2: ตรวจสอบการแจ้งซ้ำแบบ Real-time (ห้องเดียวกัน + หมวดหมู่หลัก/หมวดหมู่ย่อยเดียวกัน ที่ยังเปิดค้างอยู่)
 CREATE INDEX IF NOT EXISTS idx_tickets_open_duplicate_check
     ON tickets (room_id, category_id)
     WHERE status IN ('pending', 'in_progress', 'waiting_parts');
+
+CREATE INDEX IF NOT EXISTS idx_tickets_open_duplicate_subcat_check
+    ON tickets (room_id, category_id, subcategory_id)
+    WHERE status IN ('pending', 'in_progress', 'waiting_parts');
+
+CREATE INDEX IF NOT EXISTS idx_subcategories_category_sort
+    ON subcategories (category_id, sort_order, id);
 
 -- Index 3: รายงานสถิติรายเดือน/รายปี และตาราง Cross-tab (อาคาร x เดือน x หมวดหมู่ x สถานะ)
 CREATE INDEX IF NOT EXISTS idx_tickets_reporting_composite
@@ -368,6 +400,7 @@ ALTER TABLE buildings           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE floors              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rooms               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subcategories       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reporter_types      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE technicians         ENABLE ROW LEVEL SECURITY;

@@ -40,6 +40,7 @@ import {
   DuplicateTicketSummary,
   PublicMasterDataResponse,
   Ticket,
+  formatCategoryWithSub,
   formatThaiDateTime,
 } from '../types/api';
 
@@ -57,6 +58,7 @@ export const PublicRepairPage: React.FC = () => {
   const [roomId, setRoomId] = useState<number>(0);
   const [locationDetail, setLocationDetail] = useState<string>('');
   const [categoryId, setCategoryId] = useState<number>(0);
+  const [subcategoryId, setSubcategoryId] = useState<number>(0);
   const [reporterTypeId, setReporterTypeId] = useState<number>(0);
   const [description, setDescription] = useState<string>('');
   const [photos, setPhotos] = useState<CompressedPhotoItem[]>([]);
@@ -124,6 +126,23 @@ export const PublicRepairPage: React.FC = () => {
     return masterData.categories.find((c) => c.id === categoryId) || null;
   }, [masterData, categoryId]);
 
+  const availableSubcategories = useMemo(() => {
+    if (!masterData || !masterData.subcategories || categoryId <= 0) return [];
+    return masterData.subcategories.filter((sc) => sc.category_id === categoryId);
+  }, [masterData, categoryId]);
+
+  const selectedSubcategory = useMemo(() => {
+    if (subcategoryId <= 0) return null;
+    return availableSubcategories.find((sc) => sc.id === subcategoryId) || null;
+  }, [availableSubcategories, subcategoryId]);
+
+  const handleCategoryChange = (newCategoryId: number) => {
+    setCategoryId(newCategoryId);
+    setSubcategoryId(0);
+    setDuplicates([]);
+    setConfirmDuplicateProceed(false);
+  };
+
   const handleBuildingChange = (newBuildingId: number) => {
     setBuildingId(newBuildingId);
     setFloorId(0);
@@ -139,9 +158,14 @@ export const PublicRepairPage: React.FC = () => {
     setConfirmDuplicateProceed(false);
   };
 
-  // Real-time Duplicate Check whenever roomId AND categoryId are selected (ADR-005)
+  // Real-time Duplicate Check whenever roomId AND categoryId (and subcategoryId when available) are selected (ADR-005)
   useEffect(() => {
     if (roomId <= 0 || categoryId <= 0) {
+      setDuplicates([]);
+      setConfirmDuplicateProceed(false);
+      return;
+    }
+    if (availableSubcategories.length > 0 && subcategoryId <= 0) {
       setDuplicates([]);
       setConfirmDuplicateProceed(false);
       return;
@@ -150,7 +174,7 @@ export const PublicRepairPage: React.FC = () => {
     let active = true;
     setIsCheckingDuplicate(true);
 
-    checkDuplicateTicket(roomId, categoryId)
+    checkDuplicateTicket(roomId, categoryId, subcategoryId)
       .then((res) => {
         if (!active) return;
         setDuplicates(res.open_tickets || []);
@@ -167,7 +191,7 @@ export const PublicRepairPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [roomId, categoryId]);
+  }, [roomId, categoryId, subcategoryId, availableSubcategories.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,7 +202,13 @@ export const PublicRepairPage: React.FC = () => {
       return;
     }
     if (categoryId <= 0) {
-      setSubmitError('กรุณาเลือกหมวดหมู่งานซ่อม');
+      setSubmitError('กรุณาเลือกหมวดหมู่งานซ่อมหลัก');
+      return;
+    }
+    if (availableSubcategories.length > 0 && subcategoryId <= 0) {
+      setSubmitError(
+        'กรุณาเลือกหมวดหมู่ย่อย / รายการอุปกรณ์ที่ชำรุด (เช่น หลอดไฟ, ปลั๊กไฟ, สวิตช์ไฟ)'
+      );
       return;
     }
     if (reporterTypeId <= 0) {
@@ -195,7 +225,7 @@ export const PublicRepairPage: React.FC = () => {
     }
     if (duplicates.length > 0 && !confirmDuplicateProceed) {
       setSubmitError(
-        'พบรายการแจ้งซ่อมที่ยังเปิดค้างอยู่ในห้องและหมวดหมู่เดียวกัน กรุณาติ๊กยืนยันด้านล่างแถบสีส้มหากต้องการแจ้งเป็นรายการใหม่'
+        'พบรายการแจ้งซ่อมที่ยังเปิดค้างอยู่ในห้องและรายการย่อยเดียวกัน กรุณาติ๊กยืนยันด้านล่างแถบสีส้มหากต้องการแจ้งเป็นรายการใหม่'
       );
       return;
     }
@@ -208,6 +238,7 @@ export const PublicRepairPage: React.FC = () => {
         room_id: roomId,
         location_detail: locationDetail.trim() || undefined,
         category_id: categoryId,
+        subcategory_id: subcategoryId > 0 ? subcategoryId : undefined,
         reporter_type_id: reporterTypeId,
         description: description.trim(),
         website_honeypot: honeypotWebsite,
@@ -217,7 +248,10 @@ export const PublicRepairPage: React.FC = () => {
       const updatedLocal = saveLocalTicket({
         ticket_code: ticket.ticket_code,
         location_summary: `${ticket.building_name} • ${ticket.floor_name} • ${ticket.room_name}`,
-        category_name: ticket.category_name,
+        category_name: formatCategoryWithSub(
+          ticket.category_name,
+          ticket.subcategory_name
+        ),
         status: ticket.status,
         created_at: ticket.created_at,
       });
@@ -239,6 +273,7 @@ export const PublicRepairPage: React.FC = () => {
     setRoomId(0);
     setLocationDetail('');
     setCategoryId(0);
+    setSubcategoryId(0);
     setDescription('');
     setDuplicates([]);
     setConfirmDuplicateProceed(false);
@@ -331,7 +366,10 @@ export const PublicRepairPage: React.FC = () => {
             <div className="flex items-center justify-between gap-2">
               <span className="text-[#9BA3B8]">หมวดหมู่งานซ่อม:</span>
               <span className="text-[#F3F5FA] font-semibold text-right">
-                {createdTicket.category_name}
+                {formatCategoryWithSub(
+                  createdTicket.category_name,
+                  createdTicket.subcategory_name
+                )}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -553,7 +591,7 @@ export const PublicRepairPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Step 2: Category (Dropdown) & Reporter Type (Dropdown) */}
+          {/* Step 2: Category (2-Level: Main Category -> Subcategory/Item) & Reporter Type */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 border-b border-[#1E2235] pb-2.5">
               <div className="w-7 h-7 rounded-lg bg-[#2F6BFF]/15 text-[#5A8BFF] flex items-center justify-center font-bold text-sm shrink-0">
@@ -561,25 +599,25 @@ export const PublicRepairPage: React.FC = () => {
               </div>
               <h2 className="text-sm sm:text-base font-bold text-[#F3F5FA] flex items-center gap-2">
                 <Tag className="w-4 h-4 text-[#2F6BFF] shrink-0" />
-                <span>หมวดหมู่งานซ่อม และประเภทผู้แจ้ง</span>
+                <span>หมวดหมู่งานซ่อม (หมวดหลัก → รายการย่อย) และประเภทผู้แจ้ง</span>
               </h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* 2.1 Category Dropdown */}
+              {/* 2.1 Main Category Dropdown */}
               <div>
                 <label className="block text-xs font-semibold text-[#9BA3B8] mb-1.5">
-                  2.1 เลือกหมวดหมู่งานซ่อม <span className="text-[#FF7A1A]">*</span>
+                  2.1 หมวดหมู่งานซ่อมหลัก <span className="text-[#FF7A1A]">*</span>
                 </label>
                 <div className="relative">
                   <Tag className="w-4 h-4 text-[#9BA3B8] absolute left-3.5 top-3.5 pointer-events-none" />
                   <select
                     value={categoryId}
-                    onChange={(e) => setCategoryId(Number(e.target.value))}
+                    onChange={(e) => handleCategoryChange(Number(e.target.value))}
                     className="emms-select pl-10 text-sm py-3 sm:py-2.5"
                     required
                   >
-                    <option value={0}>-- เลือกหมวดหมู่งานซ่อม --</option>
+                    <option value={0}>-- เลือกหมวดหมู่งานซ่อมหลัก --</option>
                     {masterData?.categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.name}
@@ -588,17 +626,84 @@ export const PublicRepairPage: React.FC = () => {
                   </select>
                 </div>
                 {selectedCategory?.description && (
-                  <p className="mt-1.5 text-[11px] text-[#5A8BFF] flex items-start gap-1">
-                    <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span>ตัวอย่างอาการ: {selectedCategory.description}</span>
+                  <p className="mt-1.5 text-[11px] text-[#9BA3B8] flex items-start gap-1">
+                    <Info className="w-3.5 h-3.5 text-[#5A8BFF] shrink-0 mt-0.5" />
+                    <span>ขอบเขตงาน: {selectedCategory.description}</span>
                   </p>
                 )}
               </div>
 
-              {/* 2.2 Reporter Type Dropdown (Zero PII) */}
+              {/* 2.2 Subcategory / Specific Item Dropdown */}
               <div>
                 <label className="block text-xs font-semibold text-[#9BA3B8] mb-1.5">
-                  2.2 ประเภทผู้แจ้งซ่อม <span className="text-[#FF7A1A]">*</span>
+                  2.2 หมวดหมู่ย่อย / รายการที่ชำรุด{' '}
+                  {availableSubcategories.length > 0 && (
+                    <span className="text-[#FF7A1A]">*</span>
+                  )}
+                </label>
+                <select
+                  value={subcategoryId}
+                  onChange={(e) => setSubcategoryId(Number(e.target.value))}
+                  disabled={categoryId <= 0 || availableSubcategories.length === 0}
+                  className="emms-select text-sm py-3 sm:py-2.5 disabled:opacity-50"
+                  required={availableSubcategories.length > 0}
+                >
+                  <option value={0}>
+                    {categoryId <= 0
+                      ? '-- เลือกหมวดหมู่หลักก่อน --'
+                      : availableSubcategories.length === 0
+                      ? '-- ไม่มีรายการย่อยในหมวดนี้ --'
+                      : '-- เลือกรายการย่อย / อุปกรณ์ --'}
+                  </option>
+                  {availableSubcategories.map((sc) => (
+                    <option key={sc.id} value={sc.id}>
+                      {sc.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedSubcategory?.description && (
+                  <p className="mt-1.5 text-[11px] text-[#5A8BFF] flex items-start gap-1">
+                    <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>ตัวอย่างอาการ: {selectedSubcategory.description}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Quick-Select Pills for Subcategories when a Main Category is selected */}
+            {categoryId > 0 && availableSubcategories.length > 0 && (
+              <div className="bg-[#090A10]/80 border border-[#1E2235] rounded-xl p-3 space-y-2">
+                <span className="text-[11px] font-semibold text-[#9BA3B8] block">
+                  แตะเลือกรายการย่อยในหมวด{' '}
+                  <strong className="text-[#5A8BFF]">{selectedCategory?.name}</strong> ได้ทันที:
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {availableSubcategories.map((sc) => {
+                    const isSelected = subcategoryId === sc.id;
+                    return (
+                      <button
+                        key={sc.id}
+                        type="button"
+                        onClick={() => setSubcategoryId(sc.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                          isSelected
+                            ? 'bg-[#2F6BFF] text-white border-[#2F6BFF] shadow-sm shadow-[#2F6BFF]/30'
+                            : 'bg-[#121420] text-[#F3F5FA] border-[#1E2235] hover:border-[#2F6BFF]/60'
+                        }`}
+                      >
+                        {sc.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 2.3 Reporter Type Dropdown (Zero PII) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-[#9BA3B8] mb-1.5">
+                  2.3 ประเภทผู้แจ้งซ่อม <span className="text-[#FF7A1A]">*</span>
                 </label>
                 <div className="relative">
                   <UserCheck className="w-4 h-4 text-[#9BA3B8] absolute left-3.5 top-3.5 pointer-events-none" />
@@ -626,7 +731,7 @@ export const PublicRepairPage: React.FC = () => {
             {isCheckingDuplicate && (
               <div className="flex items-center gap-2 text-xs text-[#9BA3B8] bg-[#090A10] border border-[#1E2235] rounded-xl px-3.5 py-2.5">
                 <Loader2 className="w-4 h-4 text-[#2F6BFF] animate-spin shrink-0" />
-                <span>กำลังตรวจสอบรายการแจ้งซ่อมที่เปิดค้างในห้องและหมวดหมู่นี้...</span>
+                <span>กำลังตรวจสอบรายการแจ้งซ่อมที่เปิดค้างในห้องและหมวดหมู่ย่อยนี้...</span>
               </div>
             )}
 
@@ -638,7 +743,7 @@ export const PublicRepairPage: React.FC = () => {
                   </div>
                   <div className="space-y-1 flex-1">
                     <h3 className="text-xs sm:text-sm font-extrabold text-[#FF984D]">
-                      แจ้งเตือนงานซ้ำ: พบใบแจ้งซ่อมในห้องและหมวดหมู่นี้ที่กำลังดำเนินการอยู่ (
+                      แจ้งเตือนงานซ้ำ: พบใบแจ้งซ่อมในห้องและรายการย่อยนี้ที่กำลังดำเนินการอยู่ (
                       {duplicates.length} รายการ)
                     </h3>
                     <p className="text-xs text-[#F3F5FA]/90">
@@ -660,6 +765,12 @@ export const PublicRepairPage: React.FC = () => {
                             {dup.ticket_code}
                           </span>
                           <StatusBadge status={dup.status} short />
+                          <span className="text-[11px] font-semibold text-[#5A8BFF]">
+                            {formatCategoryWithSub(
+                              dup.category_name,
+                              dup.subcategory_name
+                            )}
+                          </span>
                           <span className="text-[#9BA3B8]">
                             {formatThaiDateTime(dup.created_at)}
                           </span>

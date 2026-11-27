@@ -775,6 +775,69 @@ export const StaffReportsPage: React.FC = () => {
           </div>
 
           {/* =================================================================
+              5.1 Subcategory Drill-Down Breakdown (สถิติเจาะลึกหมวดหมู่ย่อย / รายการอุปกรณ์)
+             ================================================================= */}
+          {report.by_subcategory && report.by_subcategory.length > 0 && (
+            <div className="emms-card p-5 space-y-3 print-break-avoid">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-base font-extrabold text-[#F3F5FA]">
+                    สถิติเจาะลึกแยกตามหมวดหมู่ย่อย / รายการอุปกรณ์ (Subcategory Breakdown)
+                  </h2>
+                  <p className="text-xs text-[#9BA3B8]">
+                    แสดงจำนวนงานซ่อมแยกตามอุปกรณ์ย่อย (เช่น หลอดไฟ, ปลั๊กไฟ, สวิตช์ไฟ) ภายใต้{' '}
+                    <strong className="text-[#5A8BFF]">{selectedCategoryName}</strong>
+                  </p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#1E2235] bg-[#090A10] text-[#9BA3B8]">
+                      <th className="py-2.5 px-3 text-left">หมวดหมู่ย่อย / อุปกรณ์</th>
+                      <th className="py-2.5 px-3 text-left">สังกัดหมวดหมู่หลัก</th>
+                      <th className="py-2.5 px-2 text-right">รวม</th>
+                      <th className="py-2.5 px-2 text-right text-emerald-400">
+                        ซ่อมเสร็จ
+                      </th>
+                      <th className="py-2.5 px-2 text-right text-[#FF984D]">งานค้าง</th>
+                      <th className="py-2.5 px-2 text-right">ซ่อมไม่ได้</th>
+                      <th className="py-2.5 px-2 text-right">สัดส่วน</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1E2235]">
+                    {report.by_subcategory.map((sc) => (
+                      <tr key={sc.subcategory_id} className="hover:bg-[#171A29]">
+                        <td className="py-2 px-3 font-semibold text-[#F3F5FA]">
+                          {sc.subcategory_name}
+                        </td>
+                        <td className="py-2 px-3 text-[#9BA3B8]">
+                          {sc.category_name}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono font-bold text-[#F3F5FA]">
+                          {sc.total}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono text-emerald-400">
+                          {sc.completed}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono text-[#FF984D]">
+                          {sc.open_backlog}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono text-[#9BA3B8]">
+                          {sc.unrepairable}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono text-[#5A8BFF]">
+                          {sc.percentage.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================
               6. Top Hotspot Rooms & Technician Performance Side-by-Side
              ================================================================= */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

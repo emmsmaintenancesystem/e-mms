@@ -23,6 +23,7 @@ type NewTicketPayload struct {
 	RoomName         string
 	LocationDetail   string
 	CategoryName     string
+	SubcategoryName  string
 	ReporterTypeName string
 	Description      string
 	FirstPhotoURL    string
@@ -159,12 +160,17 @@ func (b *BotNotifier) FormatThaiMessage(p NewTicketPayload) string {
 	}
 	directLink := fmt.Sprintf("%s/#/staff/tickets?code=%s", baseURL, p.TicketCode)
 
+	catDisplay := p.CategoryName
+	if sub := strings.TrimSpace(p.SubcategoryName); sub != "" {
+		catDisplay = fmt.Sprintf("%s › %s", p.CategoryName, sub)
+	}
+
 	var sb strings.Builder
 	sb.WriteString("🔧 แจ้งซ่อมใหม่ (e-MMS)\n")
 	sb.WriteString("━━━━━━━━━━━━━━━━━━\n")
 	sb.WriteString(fmt.Sprintf("📌 รหัสใบงาน: %s\n", p.TicketCode))
 	sb.WriteString(fmt.Sprintf("🏢 สถานที่: %s\n", locationStr))
-	sb.WriteString(fmt.Sprintf("🛠 หมวดหมู่: %s\n", p.CategoryName))
+	sb.WriteString(fmt.Sprintf("🛠 หมวดหมู่: %s\n", catDisplay))
 	sb.WriteString(fmt.Sprintf("👤 ประเภทผู้แจ้ง: %s\n", p.ReporterTypeName))
 	sb.WriteString(fmt.Sprintf("📝 อาการ/รายละเอียด: %s\n", strings.TrimSpace(p.Description)))
 	sb.WriteString(fmt.Sprintf("🕒 เวลาที่แจ้ง: %s\n", timeStr))

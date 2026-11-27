@@ -59,10 +59,11 @@ func (h *PublicHandler) GetMasterData(w http.ResponseWriter, r *http.Request) {
 }
 
 // CheckDuplicate checks in real time whether there is already an open ticket
-// in the selected room_id + category_id (ADR-005).
+// in the selected room_id + category_id (and subcategory_id when provided) (ADR-005).
 func (h *PublicHandler) CheckDuplicate(w http.ResponseWriter, r *http.Request) {
 	roomID := parseIntQuery(r, "room_id", 0)
 	categoryID := parseIntQuery(r, "category_id", 0)
+	subcategoryID := parseIntQuery(r, "subcategory_id", 0)
 
 	if roomID <= 0 || categoryID <= 0 {
 		WriteJSON(w, http.StatusOK, model.DuplicateCheckResponse{
@@ -73,7 +74,7 @@ func (h *PublicHandler) CheckDuplicate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	openTickets, err := h.ticketRepo.CheckDuplicate(r.Context(), roomID, categoryID)
+	openTickets, err := h.ticketRepo.CheckDuplicate(r.Context(), roomID, categoryID, subcategoryID)
 	if err != nil {
 		HandleRepoError(w, err, "")
 		return
@@ -118,6 +119,11 @@ func (h *PublicHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 	floorID, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("floor_id")))
 	roomID, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("room_id")))
 	categoryID, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("category_id")))
+	subcategoryIDVal, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("subcategory_id")))
+	var subcategoryIDPtr *int
+	if subcategoryIDVal > 0 {
+		subcategoryIDPtr = &subcategoryIDVal
+	}
 	reporterTypeID, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("reporter_type_id")))
 	locationDetail := strPtrOrNil(r.FormValue("location_detail"))
 	description := strings.TrimSpace(r.FormValue("description"))
@@ -188,6 +194,7 @@ func (h *PublicHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		RoomID:         roomID,
 		LocationDetail: locationDetail,
 		CategoryID:     categoryID,
+		SubcategoryID:  subcategoryIDPtr,
 		ReporterTypeID: reporterTypeID,
 		Description:    description,
 		Photos:         photoRecords,
@@ -202,6 +209,10 @@ func (h *PublicHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		locDetail := ""
 		if createdTicket.LocationDetail != nil {
 			locDetail = *createdTicket.LocationDetail
+		}
+		subcatName := ""
+		if createdTicket.SubcategoryName != nil {
+			subcatName = *createdTicket.SubcategoryName
 		}
 		firstPhotoURL := ""
 		if len(createdTicket.BeforePhotos) > 0 {
@@ -221,6 +232,7 @@ func (h *PublicHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 			RoomName:         createdTicket.RoomName,
 			LocationDetail:   locDetail,
 			CategoryName:     createdTicket.CategoryName,
+			SubcategoryName:  subcatName,
 			ReporterTypeName: createdTicket.ReporterTypeName,
 			Description:      createdTicket.Description,
 			FirstPhotoURL:    firstPhotoURL,

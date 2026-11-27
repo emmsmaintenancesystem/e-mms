@@ -176,6 +176,19 @@ export interface Category {
   updated_at: string;
 }
 
+export interface Subcategory {
+  id: number;
+  category_id: number;
+  category_name?: string;
+  code: string | null;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ReporterType {
   id: number;
   code: string | null;
@@ -214,6 +227,7 @@ export interface PublicMasterDataResponse {
   floors: Floor[];
   rooms: Room[];
   categories: Category[];
+  subcategories: Subcategory[];
   reporter_types: ReporterType[];
 }
 
@@ -267,6 +281,8 @@ export interface Ticket {
   location_detail: string | null;
   category_id: number;
   category_name: string;
+  subcategory_id?: number | null;
+  subcategory_name?: string | null;
   reporter_type_id: number;
   reporter_type_name: string;
   description: string;
@@ -293,6 +309,8 @@ export interface DuplicateTicketSummary {
   status_label: string;
   room_name: string;
   category_name: string;
+  subcategory_id?: number | null;
+  subcategory_name?: string | null;
   location_detail: string | null;
   description: string;
   created_at: string;
@@ -313,6 +331,8 @@ export interface PublicBoardItem {
   location_detail?: string | null;
   category_id: number;
   category_name: string;
+  subcategory_id?: number | null;
+  subcategory_name?: string | null;
   status: TicketStatus;
   status_label: string;
   created_at: string;
@@ -386,6 +406,20 @@ export interface CategoryStatItem {
   percentage: number;
 }
 
+export interface SubcategoryStatItem {
+  subcategory_id: number;
+  category_id: number;
+  category_name: string;
+  subcategory_code: string;
+  subcategory_name: string;
+  total: number;
+  open_backlog: number;
+  completed: number;
+  unrepairable: number;
+  cancelled: number;
+  percentage: number;
+}
+
 export interface BuildingStatItem {
   building_id: number;
   building_code: string;
@@ -438,6 +472,7 @@ export interface ReportSummaryResponse {
   status_breakdown: StatusStatItem[];
   monthly_trend: MonthlyTrendItem[];
   by_category: CategoryStatItem[];
+  by_subcategory?: SubcategoryStatItem[];
   by_building: BuildingStatItem[];
   top_rooms: RoomHotspotItem[];
   executive_matrix: ExecutiveMatrixRow[];
@@ -448,6 +483,17 @@ export interface ReportSummaryResponse {
 // =============================================================================
 // 4. Formatting Helpers
 // =============================================================================
+
+export function formatCategoryWithSub(
+  categoryName: string,
+  subcategoryName?: string | null
+): string {
+  const sub = subcategoryName?.trim();
+  if (sub) {
+    return `${categoryName} › ${sub}`;
+  }
+  return categoryName;
+}
 
 export function formatThaiDateTime(isoString?: string | null): string {
   if (!isoString) return '-';

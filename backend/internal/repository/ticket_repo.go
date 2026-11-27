@@ -21,21 +21,24 @@ func NewTicketRepository(pool *pgxpool.Pool) TicketRepository {
 }
 
 // CheckDuplicate checks for existing open tickets (pending, in_progress, waiting_parts)
-// in the exact same room_id and category_id (ADR-005).
-func (r *pgTicketRepo) CheckDuplicate(ctx context.Context, roomID int, categoryID int) ([]model.DuplicateTicketSummary, error) {
+// in the exact same room_id and category_id (and subcategory_id when provided) (ADR-005).
+func (r *pgTicketRepo) CheckDuplicate(ctx context.Context, roomID int, categoryID int, subcategoryID int) ([]model.DuplicateTicketSummary, error) {
 	query := `
 		SELECT t.ticket_code, t.status, rm.name AS room_name, c.name AS category_name,
+		       t.subcategory_id, sc.name AS subcategory_name,
 		       t.location_detail, t.description, t.created_at
 		FROM tickets t
 		JOIN rooms rm ON rm.id = t.room_id
 		JOIN categories c ON c.id = t.category_id
+		LEFT JOIN subcategories sc ON sc.id = t.subcategory_id
 		WHERE t.room_id = $1
 		  AND t.category_id = $2
+		  AND ($3::int = 0 OR t.subcategory_id = $3)
 		  AND t.status IN ('pending', 'in_progress', 'waiting_parts')
 		ORDER BY t.created_at DESC
 		LIMIT 5
 	`
-	rows, err := r.pool.Query(ctx, query, roomID, categoryID)
+	rows, err := r.pool.Query(ctx, query, roomID, categoryID, subcategoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,6 +52,8 @@ func (r *pgTicketRepo) CheckDuplicate(ctx context.Context, roomID int, categoryI
 			&item.Status,
 			&item.RoomName,
 			&item.CategoryName,
+			&item.SubcategoryID,
+			&item.SubcategoryName,
 			&item.LocationDetail,
 			&item.Description,
 			&item.CreatedAt,
@@ -73,9 +78,9 @@ func (r *pgTicketRepo) CreateTicket(ctx context.Context, input model.CreateTicke
 	insertTicketSQL := `
 		INSERT INTO tickets (
 			building_id, floor_id, room_id, location_detail,
-			category_id, reporter_type_id, description, status
+			category_id, subcategory_id, reporter_type_id, description, status
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
 		RETURNING id
 	`
 	var ticketID int
@@ -85,6 +90,7 @@ func (r *pgTicketRepo) CreateTicket(ctx context.Context, input model.CreateTicke
 		input.RoomID,
 		cleanNullStr(input.LocationDetail),
 		input.CategoryID,
+		input.SubcategoryID,
 		input.ReporterTypeID,
 		strings.TrimSpace(input.Description),
 	).Scan(&ticketID)
@@ -140,6 +146,7 @@ const baseTicketSelectSQL = `
 		t.room_id, rm.code AS room_code, rm.name AS room_name,
 		t.location_detail,
 		t.category_id, c.name AS category_name,
+		t.subcategory_id, sc.name AS subcategory_name,
 		t.reporter_type_id, rt.name AS reporter_type_name,
 		t.description, t.status, t.status_note,
 		t.acknowledged_by_user_id, u_ack.display_name AS acknowledged_by_name, t.acknowledged_at,
@@ -150,6 +157,7 @@ const baseTicketSelectSQL = `
 	JOIN floors f ON f.id = t.floor_id
 	JOIN rooms rm ON rm.id = t.room_id
 	JOIN categories c ON c.id = t.category_id
+	LEFT JOIN subcategories sc ON sc.id = t.subcategory_id
 	JOIN reporter_types rt ON rt.id = t.reporter_type_id
 	LEFT JOIN users u_ack ON u_ack.id = t.acknowledged_by_user_id
 	LEFT JOIN users u_cls ON u_cls.id = t.closed_by_user_id
@@ -191,6 +199,7 @@ func (r *pgTicketRepo) scanSingleTicket(ctx context.Context, query string, arg i
 		&t.RoomID, &t.RoomCode, &t.RoomName,
 		&t.LocationDetail,
 		&t.CategoryID, &t.CategoryName,
+		&t.SubcategoryID, &t.SubcategoryName,
 		&t.ReporterTypeID, &t.ReporterTypeName,
 		&t.Description, &t.Status, &t.StatusNote,
 		&t.AcknowledgedByUserID, &t.AcknowledgedByName, &t.AcknowledgedAt,
@@ -326,6 +335,7 @@ func (r *pgTicketRepo) ListPublicBoard(ctx context.Context, limit int, status st
 			rm.name AS room_name,
 			t.location_detail,
 			t.category_id, c.name AS category_name,
+			t.subcategory_id, sc.name AS subcategory_name,
 			t.status,
 			t.created_at, t.updated_at
 		FROM tickets t
@@ -333,6 +343,7 @@ func (r *pgTicketRepo) ListPublicBoard(ctx context.Context, limit int, status st
 		JOIN floors f ON f.id = t.floor_id
 		JOIN rooms rm ON rm.id = t.room_id
 		JOIN categories c ON c.id = t.category_id
+		LEFT JOIN subcategories sc ON sc.id = t.subcategory_id
 		WHERE ($1::text = '' OR t.status = $1)
 		  AND ($2::int = 0 OR t.building_id = $2)
 		ORDER BY t.created_at DESC
@@ -354,6 +365,7 @@ func (r *pgTicketRepo) ListPublicBoard(ctx context.Context, limit int, status st
 			&item.RoomName,
 			&item.LocationDetail,
 			&item.CategoryID, &item.CategoryName,
+			&item.SubcategoryID, &item.SubcategoryName,
 			&item.Status,
 			&item.CreatedAt, &item.UpdatedAt,
 		); err != nil {
@@ -398,13 +410,16 @@ func (r *pgTicketRepo) ListStaffTickets(ctx context.Context, filter model.Ticket
 		       OR t.description ILIKE $8
 		       OR rm.name ILIKE $8
 		       OR COALESCE(t.location_detail, '') ILIKE $8
+		       OR COALESCE(sc.name, '') ILIKE $8
 		  ))
+		  AND ($9::int = 0 OR t.subcategory_id = $9)
 	`
 
 	countSQL := `
 		SELECT COUNT(*)
 		FROM tickets t
 		JOIN rooms rm ON rm.id = t.room_id
+		LEFT JOIN subcategories sc ON sc.id = t.subcategory_id
 	` + whereClause
 
 	var total int
@@ -417,6 +432,7 @@ func (r *pgTicketRepo) ListStaffTickets(ctx context.Context, filter model.Ticket
 		filter.Year,
 		filter.Month,
 		searchPattern,
+		filter.SubcategoryID,
 	).Scan(&total)
 	if err != nil {
 		return nil, err
@@ -434,7 +450,7 @@ func (r *pgTicketRepo) ListStaffTickets(ctx context.Context, filter model.Ticket
 				ELSE 7
 			END ASC,
 			t.created_at DESC
-		LIMIT $9 OFFSET $10
+		LIMIT $10 OFFSET $11
 	`
 
 	rows, err := r.pool.Query(ctx, listSQL,
@@ -446,6 +462,7 @@ func (r *pgTicketRepo) ListStaffTickets(ctx context.Context, filter model.Ticket
 		filter.Year,
 		filter.Month,
 		searchPattern,
+		filter.SubcategoryID,
 		filter.Limit,
 		filter.Offset,
 	)
@@ -467,6 +484,7 @@ func (r *pgTicketRepo) ListStaffTickets(ctx context.Context, filter model.Ticket
 			&t.RoomID, &t.RoomCode, &t.RoomName,
 			&t.LocationDetail,
 			&t.CategoryID, &t.CategoryName,
+			&t.SubcategoryID, &t.SubcategoryName,
 			&t.ReporterTypeID, &t.ReporterTypeName,
 			&t.Description, &t.Status, &t.StatusNote,
 			&t.AcknowledgedByUserID, &t.AcknowledgedByName, &t.AcknowledgedAt,

@@ -30,6 +30,7 @@ func GenerateCSV(tickets []model.ExportTicketRow) ([]byte, error) {
 		"ห้อง/บริเวณ",
 		"รายละเอียดจุดย่อย",
 		"หมวดหมู่งานซ่อม",
+		"หมวดหมู่ย่อย/รายการอุปกรณ์",
 		"ประเภทผู้แจ้ง",
 		"อาการ/รายละเอียดปัญหา",
 		"สถานะ",
@@ -43,6 +44,10 @@ func GenerateCSV(tickets []model.ExportTicketRow) ([]byte, error) {
 	}
 
 	for _, t := range tickets {
+		subcat := t.SubcategoryName
+		if subcat == "" {
+			subcat = "-"
+		}
 		record := []string{
 			t.TicketCode,
 			formatThaiDateTime(&t.CreatedAt),
@@ -51,6 +56,7 @@ func GenerateCSV(tickets []model.ExportTicketRow) ([]byte, error) {
 			t.RoomName,
 			t.LocationDetail,
 			t.CategoryName,
+			subcat,
 			t.ReporterTypeName,
 			t.Description,
 			t.StatusLabel,
@@ -160,6 +166,30 @@ func writeSummarySheet(f *excelize.File, sheet string, s *model.ReportSummaryRes
 		rowIdx++
 	}
 
+	// Subcategory Breakdown
+	if len(s.BySubcategory) > 0 {
+		rowIdx += 2
+		_ = f.SetCellValue(sheet, fmt.Sprintf("A%d", rowIdx), "สถิติเจาะลึกหมวดหมู่ย่อย / รายการอุปกรณ์")
+		_ = f.SetCellValue(sheet, fmt.Sprintf("B%d", rowIdx), "หมวดหมู่หลัก")
+		_ = f.SetCellValue(sheet, fmt.Sprintf("C%d", rowIdx), "รวมทั้งหมด")
+		_ = f.SetCellValue(sheet, fmt.Sprintf("D%d", rowIdx), "งานค้าง")
+		_ = f.SetCellValue(sheet, fmt.Sprintf("E%d", rowIdx), "ซ่อมเสร็จ")
+		_ = f.SetCellValue(sheet, fmt.Sprintf("F%d", rowIdx), "ซ่อมไม่ได้")
+		_ = f.SetCellValue(sheet, fmt.Sprintf("G%d", rowIdx), "สัดส่วน (%)")
+		rowIdx++
+
+		for _, sc := range s.BySubcategory {
+			_ = f.SetCellValue(sheet, fmt.Sprintf("A%d", rowIdx), sc.SubcategoryName)
+			_ = f.SetCellValue(sheet, fmt.Sprintf("B%d", rowIdx), sc.CategoryName)
+			_ = f.SetCellValue(sheet, fmt.Sprintf("C%d", rowIdx), sc.Total)
+			_ = f.SetCellValue(sheet, fmt.Sprintf("D%d", rowIdx), sc.OpenBacklog)
+			_ = f.SetCellValue(sheet, fmt.Sprintf("E%d", rowIdx), sc.Completed)
+			_ = f.SetCellValue(sheet, fmt.Sprintf("F%d", rowIdx), sc.Unrepairable)
+			_ = f.SetCellValue(sheet, fmt.Sprintf("G%d", rowIdx), sc.Percentage)
+			rowIdx++
+		}
+	}
+
 	// Technician Performance
 	rowIdx += 2
 	_ = f.SetCellValue(sheet, fmt.Sprintf("A%d", rowIdx), "สถิติผลการปฏิบัติงานของช่าง")
@@ -250,6 +280,7 @@ func writeTicketsSheet(f *excelize.File, sheet string, tickets []model.ExportTic
 		"ห้อง/บริเวณ",
 		"รายละเอียดจุดย่อย",
 		"หมวดหมู่งานซ่อม",
+		"หมวดหมู่ย่อย/รายการอุปกรณ์",
 		"ประเภทผู้แจ้ง",
 		"อาการ/รายละเอียดปัญหา",
 		"สถานะ",
@@ -266,6 +297,10 @@ func writeTicketsSheet(f *excelize.File, sheet string, tickets []model.ExportTic
 
 	for i, t := range tickets {
 		rowNum := i + 2
+		subcat := t.SubcategoryName
+		if subcat == "" {
+			subcat = "-"
+		}
 		values := []interface{}{
 			strconv.Itoa(i + 1),
 			t.TicketCode,
@@ -275,6 +310,7 @@ func writeTicketsSheet(f *excelize.File, sheet string, tickets []model.ExportTic
 			t.RoomName,
 			t.LocationDetail,
 			t.CategoryName,
+			subcat,
 			t.ReporterTypeName,
 			t.Description,
 			t.StatusLabel,

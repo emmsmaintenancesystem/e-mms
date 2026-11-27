@@ -46,6 +46,7 @@ import {
   Ticket,
   TicketPhoto,
   TicketStatus,
+  formatCategoryWithSub,
   formatThaiDateTime,
 } from '../types/api';
 
@@ -534,7 +535,10 @@ export const StaffTicketsPage: React.FC = () => {
                         </span>
                         <StatusBadge status={ticket.status} />
                         <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#171A29] text-[#F3F5FA] border border-[#1E2235]">
-                          {ticket.category_name}
+                          {formatCategoryWithSub(
+                            ticket.category_name,
+                            ticket.subcategory_name
+                          )}
                         </span>
                         <span className="text-xs text-[#9BA3B8]">
                           ผู้แจ้ง: {ticket.reporter_type_name}
@@ -694,7 +698,10 @@ export const StaffTicketsPage: React.FC = () => {
                     <Wrench className="w-4 h-4 text-[#2F6BFF]" />
                     <span className="text-xs text-[#9BA3B8]">หมวดหมู่:</span>
                     <span className="font-semibold text-[#F3F5FA]">
-                      {activeTicket.category_name}
+                      {formatCategoryWithSub(
+                        activeTicket.category_name,
+                        activeTicket.subcategory_name
+                      )}
                     </span>
                   </div>
 
